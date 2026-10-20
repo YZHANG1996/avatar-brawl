@@ -81,10 +81,16 @@ const App = (() => {
   }
 
   // ---------- 槽位 ----------
-  function setSlot(slot, canvas, opts = {}) {
-    const feature = AvatarAnalyzer.analyze(canvas);
-    slots[slot] = { avatar: canvas, feature };
-    try { localStorage.setItem('ab_slot' + slot, toDataURL(canvas)); } catch (e) { /* 空间不足忽略 */ }
+  // source 必须是原始图片(照片原图/生成的画布): 分析只做一次, 结果与 PNG 头像一起持久化,
+  // 恢复时直接读结果不再重算 —— 若每次重存 JPEG 再重分析, 有损压缩的代际漂移会让战力每次都变
+  function setSlot(slot, source, opts = {}) {
+    const avatar = normalizeToCanvas(source);
+    const feature = AvatarAnalyzer.analyze(source);
+    const imgData = avatar.toDataURL('image/png');
+    slots[slot] = { avatar, feature, imgData };
+    try {
+      localStorage.setItem('ab_slot' + slot, JSON.stringify({ img: imgData, feature }));
+    } catch (e) { /* 空间不足忽略 */ }
     if (!opts.silent) showAppraisal(slot);
     refreshHome();
   }
@@ -96,7 +102,7 @@ const App = (() => {
       const img = el.querySelector('img');
       const info = el.querySelector('.slot-info');
       if (s) {
-        img.src = toDataURL(s.avatar);
+        img.src = s.imgData || toDataURL(s.avatar);
         img.style.display = 'block';
         el.querySelector('.slot-empty').style.display = 'none';
         const E = ELEMENTS[s.feature.element];
@@ -206,7 +212,7 @@ const App = (() => {
         if (!file) return;
         const url = URL.createObjectURL(file);
         const img = new Image();
-        img.onload = () => { setSlot(slot, normalizeToCanvas(img)); URL.revokeObjectURL(url); };
+        img.onload = () => { setSlot(slot, img); URL.revokeObjectURL(url); };
         img.onerror = () => toast('图片读取失败，换一张试试');
         img.src = url;
         input.value = '';
@@ -241,14 +247,29 @@ const App = (() => {
     document.getElementById('btnHome').addEventListener('click', () => switchScreen('scr-home'));
     document.getElementById('btnCopy').addEventListener('click', copyReport);
 
-    // 恢复上次头像
+    // 恢复上次头像: 新格式 {img, feature} 直接读结果; 旧格式(纯dataURL)迁移一次后稳定
     for (const slot of ['A', 'B']) {
       const saved = localStorage.getItem('ab_slot' + slot);
-      if (saved) {
-        const img = new Image();
-        img.onload = () => setSlot(slot, normalizeToCanvas(img), { silent: true });
+      if (!saved) continue;
+      const img = new Image();
+      let feature = null;
+      if (saved.startsWith('{')) {
+        try {
+          const d = JSON.parse(saved);
+          feature = d.feature;
+          img.src = d.img;
+        } catch (e) { continue; }
+      } else {
         img.src = saved;
       }
+      img.onload = () => {
+        if (feature) {
+          slots[slot] = { avatar: normalizeToCanvas(img), feature, imgData: img.src };
+          refreshHome();
+        } else {
+          setSlot(slot, img, { silent: true });
+        }
+      };
     }
     refreshHome();
   }

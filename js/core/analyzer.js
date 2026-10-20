@@ -34,12 +34,41 @@ const AvatarAnalyzer = (() => {
     return 'gray';
   }
 
-  function analyze(source) {
+  // 按原图尺寸取像素后手动均值降采样 —— drawImage 缩放算法因浏览器/设备而异,
+  // 直接用它降采样会让同一张照片在不同手机上算出不同战力
+  function downsample(source) {
+    const sw = source.width, sh = source.height;
     const cv = document.createElement('canvas');
-    cv.width = S; cv.height = S;
+    cv.width = sw; cv.height = sh;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(source, 0, 0, S, S);
-    const data = ctx.getImageData(0, 0, S, S).data;
+    ctx.drawImage(source, 0, 0); // 1:1 绘制, 不缩放
+    const full = ctx.getImageData(0, 0, sw, sh).data;
+    // 中心方形裁剪区(与展示用 normalizeToCanvas 的裁剪一致)
+    const side = Math.min(sw, sh);
+    const ox = (sw - side) / 2, oy = (sh - side) / 2;
+    const data = new Uint8ClampedArray(S * S * 4);
+    for (let ty = 0; ty < S; ty++) {
+      for (let tx = 0; tx < S; tx++) {
+        const x0 = ox + Math.floor(tx * side / S);
+        const x1 = Math.max(x0 + 1, ox + Math.floor((tx + 1) * side / S));
+        const y0 = oy + Math.floor(ty * side / S);
+        const y1 = Math.max(y0 + 1, oy + Math.floor((ty + 1) * side / S));
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let y = y0; y < y1; y++) {
+          for (let x = x0; x < x1; x++) {
+            const i = (y * sw + x) * 4;
+            r += full[i]; g += full[i + 1]; b += full[i + 2]; n++;
+          }
+        }
+        const o = (ty * S + tx) * 4;
+        data[o] = r / n; data[o + 1] = g / n; data[o + 2] = b / n; data[o + 3] = 255;
+      }
+    }
+    return data;
+  }
+
+  function analyze(source) {
+    const data = downsample(source);
     const total = S * S;
     const lum = new Float32Array(total);
     const buckets = { fire: 0, metal: 0, wood: 0, water: 0, earth: 0, thunder: 0, gray: 0 };
