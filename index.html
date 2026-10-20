@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>头像大乱斗 ⚔️ 你的头像能打几分？</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0b0d14; color: #e8e6df;
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    min-height: 100vh; display: flex; justify-content: center;
+  }
+  #app { width: 100%; max-width: 480px; position: relative; }
+  .screen { display: none; min-height: 100vh; flex-direction: column; align-items: center; }
+  .screen.active { display: flex; }
+
+  /* ---- 首页 ---- */
+  #scr-home { padding: 40px 20px 30px; }
+  .logo { text-align: center; margin-bottom: 8px; }
+  .logo h1 {
+    font-size: 44px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(180deg, #ffe9a0, #ffb03c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 6px 24px rgba(255, 176, 60, .25);
+  }
+  .logo p { color: rgba(232,230,223,.5); margin-top: 6px; font-size: 15px; }
+  .arena { display: flex; align-items: center; justify-content: space-between; margin: 34px 0 10px; width: 100%; }
+  .slot {
+    width: 152px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px; padding: 18px 10px 14px;
+  }
+  .slot .pic {
+    width: 108px; height: 108px; border-radius: 24px; position: relative;
+    background: rgba(255,255,255,.05); overflow: hidden;
+  }
+  .slot img { width: 100%; height: 100%; object-fit: cover; border-radius: 24px; }
+  .slot-empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 44px; color: rgba(255,255,255,.18);
+  }
+  .slot-info { text-align: center; font-size: 13px; line-height: 1.7; min-height: 44px; }
+  .slot-info b { display: block; font-size: 15px; }
+  .slot-info span { color: rgba(232,230,223,.6); }
+  .slot-btns { display: flex; gap: 8px; }
+  .mini {
+    flex: 1; padding: 9px 0; font-size: 14px; font-weight: 700; border: none; border-radius: 12px;
+    background: rgba(255,255,255,.10); color: #e8e6df; cursor: pointer;
+  }
+  .mini:active { transform: scale(.95); }
+  .mini.gold { background: linear-gradient(180deg, #ffe9a0, #ffb03c); color: #4a2c00; }
+  .vs {
+    font-size: 40px; font-weight: 900; font-style: italic;
+    color: #ff5a3c; text-shadow: 0 0 18px rgba(255,90,60,.5);
+  }
+  .boss-area { width: 100%; margin-top: 18px; text-align: center; }
+  .boss-area .tip { font-size: 13px; color: rgba(232,230,223,.45); margin-bottom: 10px; }
+  .chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .chip {
+    padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.05); color: #e8e6df; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .chip:active { transform: scale(.95); }
+  #fightBtn {
+    width: 100%; margin-top: 28px; padding: 20px 0; border: none; border-radius: 20px;
+    font-size: 24px; font-weight: 900; letter-spacing: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #ffe9a0, #ff9d3c);
+    color: #4a2c00; box-shadow: 0 10px 30px rgba(255,157,60,.35);
+  }
+  #fightBtn:disabled { filter: grayscale(1); opacity: .35; box-shadow: none; }
+  #fightBtn:not(:disabled):active { transform: scale(.97); }
+  .privacy { margin-top: 20px; font-size: 12px; color: rgba(232,230,223,.35); text-align: center; line-height: 1.8; }
+
+  /* ---- 画布屏 ---- */
+  #scr-appraise, #scr-battle { position: relative; background: #131622; }
+  canvas.stage { width: 100%; display: block; }
+  .float-btn {
+    position: absolute; padding: 10px 22px; border: none; border-radius: 999px;
+    background: rgba(255,255,255,.12); color: #e8e6df; font-size: 15px; font-weight: 700; cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+  #apBack { bottom: 26px; left: 50%; transform: translateX(-50%); padding: 14px 46px; font-size: 17px;
+    background: linear-gradient(180deg, #ffe9a0, #ffb03c); color: #4a2c00; }
+  #speedBtn { top: 18px; right: 16px; }
+
+  /* ---- 结算 ---- */
+  #resultOverlay {
+    display: none; position: absolute; inset: 0; z-index: 10;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(8, 10, 18, .82); backdrop-filter: blur(8px); padding: 24px;
+  }
+  .res-card {
+    width: 100%; max-width: 400px; background: #1b2033; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px; padding: 30px 24px; text-align: center;
+  }
+  #resultTitle { font-size: 36px; font-weight: 900; }
+  #resultSub { color: rgba(232,230,223,.6); font-size: 14px; margin: 10px 0 18px; line-height: 1.6; }
+  #resultStats { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #resultStats td { padding: 9px 6px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #resultStats td:first-child, #resultStats td:last-child { font-weight: 900; font-size: 16px; width: 26%; }
+  #resultStats td:last-child { color: #ff8a80; }
+  #resultStats td:first-child { color: #8ad0ff; }
+  #resultStats td:nth-child(2) { color: rgba(232,230,223,.55); }
+  .res-btns { display: flex; gap: 10px; margin-top: 22px; }
+  .res-btns button {
+    flex: 1; padding: 13px 0; border: none; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer;
+  }
+  .res-btns .primary { background: linear-gradient(180deg, #ffe9a0, #ffb03c); color: #4a2c00; }
+  .res-btns .ghost { background: rgba(255,255,255,.1); color: #e8e6df; }
+
+  /* ---- toast ---- */
+  #toast {
+    position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%) translateY(20px);
+    background: rgba(20,24,38,.95); border: 1px solid rgba(255,255,255,.15);
+    padding: 12px 24px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: all .3s; z-index: 99;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 首页 -->
+  <div id="scr-home" class="screen active">
+    <div class="logo">
+      <h1>头像大乱斗</h1>
+      <p>你的头像，能打几分？</p>
+    </div>
+    <div class="arena">
+      <div class="slot" id="slotA">
+        <div class="pic">
+          <img alt="我方头像" style="display:none">
+          <div class="slot-empty">＋</div>
+        </div>
+        <div class="slot-info"></div>
+        <div class="slot-btns">
+          <button class="mini gold" onclick="document.getElementById('fileA').click()">上传头像</button>
+          <button class="mini" id="randA">🎲</button>
+        </div>
+        <input type="file" id="fileA" accept="image/*" hidden>
+      </div>
+      <div class="vs">VS</div>
+      <div class="slot" id="slotB">
+        <div class="pic">
+          <img alt="敌方头像" style="display:none">
+          <div class="slot-empty">＋</div>
+        </div>
+        <div class="slot-info"></div>
+        <div class="slot-btns">
+          <button class="mini gold" onclick="document.getElementById('fileB').click()">上传头像</button>
+          <button class="mini" id="randB">🎲</button>
+        </div>
+        <input type="file" id="fileB" accept="image/*" hidden>
+      </div>
+    </div>
+    <div class="boss-area">
+      <div class="tip">—— 或挑战试炼守卫 ——</div>
+      <div class="chips" id="bossRow"></div>
+    </div>
+    <button id="fightBtn" disabled>⚔️ 开 战</button>
+    <div class="privacy">头像仅在本机浏览器分析，不上传服务器<br>同一头像鉴定结果永远一致</div>
+  </div>
+
+  <!-- 鉴定 -->
+  <div id="scr-appraise" class="screen">
+    <canvas id="apCanvas" class="stage" width="750" height="1334"></canvas>
+    <button id="apBack" class="float-btn">返回选择对手</button>
+  </div>
+
+  <!-- 战斗 -->
+  <div id="scr-battle" class="screen">
+    <canvas id="btCanvas" class="stage" width="750" height="1334"></canvas>
+    <button id="speedBtn" class="float-btn" data-v="1">▶ 加速</button>
+    <div id="resultOverlay">
+      <div class="res-card">
+        <div id="resultTitle"></div>
+        <div id="resultSub"></div>
+        <table id="resultStats"></table>
+        <div class="res-btns">
+          <button class="primary" id="btnReplay">🔁 再战</button>
+          <button class="ghost" id="btnHome">🏠 主页</button>
+          <button class="ghost" id="btnCopy">📋 战报</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/core/data.js"></script>
+<script src="js/core/analyzer.js"></script>
+<script src="js/core/battle.js"></script>
+<script src="js/ui/appraisal.js"></script>
+<script src="js/ui/battleScene.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
