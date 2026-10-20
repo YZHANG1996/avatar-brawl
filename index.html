@@ -108,6 +108,35 @@
   }
   .res-btns .primary { background: linear-gradient(180deg, #ffe9a0, #ffb03c); color: #4a2c00; }
   .res-btns .ghost { background: rgba(255,255,255,.1); color: #e8e6df; }
+  #btnCounter { margin-top: 10px; width: 100%; padding: 12px 0; border: 1px dashed rgba(255,215,106,.5);
+    border-radius: 12px; background: none; color: #ffd76a; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+  .ghost-big { width: 100%; margin-top: 12px; padding: 14px 0; border: 1px solid rgba(255,255,255,.14);
+    border-radius: 16px; background: rgba(255,255,255,.06); color: #e8e6df; font-size: 17px; font-weight: 800; cursor: pointer; }
+  .ghost-big:disabled { opacity: .35; }
+  .primary-big { width: 100%; margin-top: 12px; padding: 15px 0; border: none; border-radius: 16px;
+    background: linear-gradient(180deg, #ffe9a0, #ffb03c); color: #4a2c00; font-size: 17px; font-weight: 900; cursor: pointer; }
+  .primary-big:active, .ghost-big:active { transform: scale(.97); }
+
+  /* ---- 弹窗 ---- */
+  .modal {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    align-items: center; justify-content: center;
+    background: rgba(8, 10, 18, .85); backdrop-filter: blur(8px); padding: 20px;
+  }
+  .modal.show { display: flex; }
+  .modal-card {
+    width: 100%; max-width: 360px; background: #1b2033; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px; padding: 26px 22px; text-align: center; max-height: 92vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
+  .modal-sub { font-size: 13px; color: rgba(232,230,223,.55); margin-bottom: 14px; }
+  #qrCanvas { width: 240px; height: 240px; border-radius: 16px; background: #fff; margin: 4px auto 10px; display: block; }
+  .challenger-card { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.05);
+    border-radius: 16px; padding: 14px; margin: 14px 0 6px; text-align: left; }
+  .challenger-card img { width: 72px; height: 72px; border-radius: 16px; object-fit: cover; background: #0d0f16; }
+  .challenger-card div { font-size: 14px; line-height: 1.8; }
+  .challenger-card b { font-size: 17px; display: block; }
 
   /* ---- toast ---- */
   #toast {
@@ -160,6 +189,7 @@
       <div class="chips" id="bossRow"></div>
     </div>
     <button id="fightBtn" disabled>⚔️ 开 战</button>
+    <button id="btnChallenge" class="ghost-big" disabled>🔗 挑战好友</button>
     <div class="privacy">头像仅在本机浏览器分析，不上传服务器<br>同一头像鉴定结果永远一致</div>
   </div>
 
@@ -183,18 +213,47 @@
           <button class="ghost" id="btnHome">🏠 主页</button>
           <button class="ghost" id="btnCopy">📋 战报</button>
         </div>
+        <button id="btnCounter" style="display:none">🔗 回敬挑战 — 让他也来打我的头像</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 挑战面板: 生成二维码/链接 -->
+  <div id="challengePanel" class="modal">
+    <div class="modal-card">
+      <div class="modal-title">⚔️ 挑战好友</div>
+      <p class="modal-sub">把二维码发给好友，长按识别即可应战</p>
+      <canvas id="qrCanvas" width="560" height="560"></canvas>
+      <button class="primary-big" id="btnCopyChallenge">📋 复制挑战链接</button>
+      <button class="ghost-big" id="btnCloseChallenge">关闭</button>
+    </div>
+  </div>
+
+  <!-- 应战弹窗: 收到挑战 -->
+  <div id="challengeIntro" class="modal">
+    <div class="modal-card">
+      <div class="modal-title">⚔️ 挑战来袭</div>
+      <div class="challenger-card">
+        <img id="challengerImg" alt="挑战者头像">
+        <div id="challengerInfo"></div>
+      </div>
+      <button class="primary-big" id="btnAcceptUpload">📤 上传我的头像应战</button>
+      <button class="primary-big" id="btnAcceptMine" style="display:none">⚡ 用我的头像应战</button>
+      <button class="ghost-big" id="btnAcceptRandom">🎲 随机头像应战</button>
+      <button class="ghost-big" id="btnDecline">暂不应战</button>
     </div>
   </div>
 
   <div id="toast"></div>
 </div>
 
-<script src="js/core/data.js"></script>
-<script src="js/core/analyzer.js"></script>
-<script src="js/core/battle.js"></script>
-<script src="js/ui/appraisal.js"></script>
-<script src="js/ui/battleScene.js"></script>
-<script src="js/main.js"></script>
+<script src="js/lib/qrcode.js?v=8"></script>
+<script src="js/core/data.js?v=8"></script>
+<script src="js/core/analyzer.js?v=8"></script>
+<script src="js/core/challenge.js?v=8"></script>
+<script src="js/core/battle.js?v=8"></script>
+<script src="js/ui/appraisal.js?v=8"></script>
+<script src="js/ui/battleScene.js?v=8"></script>
+<script src="js/main.js?v=8"></script>
 </body>
 </html>

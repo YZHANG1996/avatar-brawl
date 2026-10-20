@@ -21,6 +21,8 @@ const App = (() => {
     B: { avatar: null, feature: null },
   };
   let lastSim = null;
+  let challengeMode = false;
+  let challengeUrl = '';
 
   // ---------- 头像工具 ----------
   function normalizeToCanvas(img) {
@@ -95,6 +97,16 @@ const App = (() => {
     refreshHome();
   }
 
+  // 外部传入已鉴定的结果(好友挑战书), 直接采用, 不再本地分析
+  function setSlotFeature(slot, avatar, feature) {
+    const imgData = avatar.toDataURL('image/png');
+    slots[slot] = { avatar, feature, imgData };
+    try {
+      localStorage.setItem('ab_slot' + slot, JSON.stringify({ img: imgData, feature }));
+    } catch (e) { /* 空间不足忽略 */ }
+    refreshHome();
+  }
+
   function refreshHome() {
     for (const slot of ['A', 'B']) {
       const el = document.getElementById('slot' + slot);
@@ -114,6 +126,80 @@ const App = (() => {
       }
     }
     document.getElementById('fightBtn').disabled = !(slots.A.feature && slots.B.feature);
+    document.getElementById('btnChallenge').disabled = !slots.A.feature;
+  }
+
+  // ---------- 好友挑战 ----------
+  function openChallengePanel() {
+    if (!slots.A.feature) return;
+    const payload = Challenge.encode(slots.A.feature, slots.A.avatar);
+    challengeUrl = Challenge.buildUrl(payload);
+    document.getElementById('challengePanel').dataset.url = challengeUrl;
+    renderQr(challengeUrl);
+    document.getElementById('challengePanel').classList.add('show');
+  }
+
+  function renderQr(text) {
+    const cv = document.getElementById('qrCanvas');
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    try {
+      const qr = qrcode(0, 'L');
+      qr.addData(text, 'Byte');
+      qr.make();
+      const count = qr.getModuleCount();
+      const cell = Math.floor(cv.width / (count + 8));
+      const offset = Math.floor((cv.width - cell * count) / 2);
+      ctx.fillStyle = '#111';
+      for (let r = 0; r < count; r++) {
+        for (let c = 0; c < count; c++) {
+          if (qr.isDark(r, c)) ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
+        }
+      }
+    } catch (e) {
+      ctx.fillStyle = '#888';
+      ctx.font = '26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('内容过长，请用下方复制链接', cv.width / 2, cv.height / 2);
+    }
+  }
+
+  function showChallengeIntro(inc) {
+    challengeMode = true;
+    const E = ELEMENTS[inc.feature.element];
+    document.getElementById('challengerInfo').innerHTML =
+      `<b style="color:${E.color}">${E.emoji} ${inc.feature.title}</b>` +
+      `<span style="color:rgba(232,230,223,.6)">${E.name}属性 · 战力 <b style="color:#ffd76a">${inc.feature.power}</b><br>向你发起挑战！</span>`;
+    document.getElementById('btnAcceptMine').style.display = slots.A.feature ? 'block' : 'none';
+    const finish = (avatarCv, srcForImg) => {
+      setSlotFeature('B', avatarCv, inc.feature);
+      document.getElementById('challengerImg').src = srcForImg;
+      document.getElementById('challengeIntro').classList.add('show');
+    };
+    if (inc.img) {
+      const img = new Image();
+      img.onload = () => finish(normalizeToCanvas(img), inc.img);
+      img.onerror = () => {
+        const av = makeRandomAvatar(inc.feature.hash, inc.feature.element);
+        finish(av, av.toDataURL('image/png'));
+      };
+      img.src = inc.img;
+    } else {
+      const av = makeRandomAvatar(inc.feature.hash, inc.feature.element);
+      finish(av, av.toDataURL('image/png'));
+    }
+  }
+
+  function acceptChallengeWith(source) {
+    document.getElementById('challengeIntro').classList.remove('show');
+    setSlot('A', source);
+  }
+
+  function maybeAutoBattle() {
+    if (challengeMode && slots.A.feature && slots.B.feature) {
+      setTimeout(startBattle, 400);
+    }
   }
 
   // ---------- 鉴定 ----------
@@ -157,6 +243,7 @@ const App = (() => {
       row('暴击次数', sim.A.crits, sim.B.crits) +
       row('闪避次数', sim.A.dodges, sim.B.dodges) +
       row('技能释放', sim.A.skills, sim.B.skills);
+    document.getElementById('btnCounter').style.display = challengeMode ? 'block' : 'none';
     ov.style.display = 'flex';
   }
 
@@ -236,7 +323,10 @@ const App = (() => {
     }
     // 按钮
     document.getElementById('fightBtn').addEventListener('click', startBattle);
-    document.getElementById('apBack').addEventListener('click', () => switchScreen('scr-home'));
+    document.getElementById('apBack').addEventListener('click', () => {
+      switchScreen('scr-home');
+      maybeAutoBattle();
+    });
     document.getElementById('speedBtn').addEventListener('click', (e) => {
       const v = e.target.dataset.v === '1' ? 2 : 1;
       e.target.dataset.v = v;
@@ -246,9 +336,39 @@ const App = (() => {
     document.getElementById('btnReplay').addEventListener('click', startBattle);
     document.getElementById('btnHome').addEventListener('click', () => switchScreen('scr-home'));
     document.getElementById('btnCopy').addEventListener('click', copyReport);
+    // 好友挑战
+    document.getElementById('btnChallenge').addEventListener('click', openChallengePanel);
+    document.getElementById('btnCloseChallenge').addEventListener('click', () => {
+      document.getElementById('challengePanel').classList.remove('show');
+    });
+    document.getElementById('btnCopyChallenge').addEventListener('click', () => {
+      if (!challengeUrl) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(challengeUrl).then(() => toast('挑战链接已复制！')).catch(() => fallbackCopy(challengeUrl, () => toast('挑战链接已复制！')));
+      } else fallbackCopy(challengeUrl, () => toast('挑战链接已复制！'));
+    });
+    document.getElementById('btnAcceptUpload').addEventListener('click', () => {
+      document.getElementById('challengeIntro').classList.remove('show');
+      document.getElementById('fileA').click();
+    });
+    document.getElementById('btnAcceptMine').addEventListener('click', () => {
+      document.getElementById('challengeIntro').classList.remove('show');
+      startBattle();
+    });
+    document.getElementById('btnAcceptRandom').addEventListener('click', () => {
+      acceptChallengeWith(makeRandomAvatar());
+    });
+    document.getElementById('btnDecline').addEventListener('click', () => {
+      challengeMode = false;
+      document.getElementById('challengeIntro').classList.remove('show');
+    });
+    document.getElementById('btnCounter').addEventListener('click', openChallengePanel);
 
+    // 链接携带好友挑战书(#c=...)则进入应战流程; 此时不再恢复旧的B槽, 避免异步恢复覆盖挑战者
+    const inc = Challenge.readIncoming();
     // 恢复上次头像: 新格式 {img, feature} 直接读结果; 旧格式(纯dataURL)迁移一次后稳定
     for (const slot of ['A', 'B']) {
+      if (inc && slot === 'B') continue;
       const saved = localStorage.getItem('ab_slot' + slot);
       if (!saved) continue;
       const img = new Image();
@@ -272,6 +392,8 @@ const App = (() => {
       };
     }
     refreshHome();
+
+    if (inc) showChallengeIntro(inc);
   }
 
   return { boot };
